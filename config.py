@@ -29,6 +29,36 @@ ANTHROPIC_MODEL_OPTIONS = os.getenv("ANTHROPIC_MODEL_OPTIONS", "claude-haiku-4-5
 # --- App behaviour ---
 MAX_PROMPT_CHARS = int(os.getenv("MAX_PROMPT_CHARS", "8000"))
 
+# Cost per 1M tokens (input, output) in USD — used for session cost estimates.
+# Update these when providers reprice.
+COST_PER_1M: dict[str, dict[str, float]] = {
+    "gemini/gemini-2.5-flash":           {"input": 0.15,  "output": 0.60},
+    "gemini/gemini-2.5-pro":             {"input": 1.25,  "output": 5.00},
+    "openai/gpt-4o-mini":                {"input": 0.15,  "output": 0.60},
+    "openai/gpt-4o":                     {"input": 2.50,  "output": 10.00},
+    "openai/o3-mini":                    {"input": 1.10,  "output": 4.40},
+    "anthropic/claude-haiku-4-5-20251001": {"input": 0.80, "output": 4.00},
+    "anthropic/claude-sonnet-4-6":       {"input": 3.00,  "output": 15.00},
+    "anthropic/claude-opus-4-7":         {"input": 15.00, "output": 75.00},
+}
+
+# Approximate context window sizes in tokens per model name.
+CONTEXT_LIMITS: dict[str, int] = {
+    "llama3.1:8b-instruct-q4_0": 128_000,
+    "gpt-oss:20b":               128_000,
+    "gemma4:latest":             128_000,
+    "mistral:latest":            32_000,
+    "gemini-2.5-flash":          1_000_000,
+    "gemini-2.5-pro":            1_000_000,
+    "gpt-4o-mini":               128_000,
+    "gpt-4o":                    128_000,
+    "o3-mini":                   200_000,
+    "claude-haiku-4-5-20251001": 200_000,
+    "claude-sonnet-4-6":         200_000,
+    "claude-opus-4-7":           200_000,
+}
+DEFAULT_CONTEXT_LIMIT = 128_000
+
 
 def _safe_path(raw: str, default: str) -> str:
     """Resolve to absolute path; reject anything that escapes the project root."""
