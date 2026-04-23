@@ -20,8 +20,6 @@ from router import heuristic_route, judge_route, quality_low, to_lc_messages
 
 load_dotenv()
 
-LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", "120"))
-
 
 # ---------------------------------------------------------------------------
 # Logger
@@ -329,7 +327,7 @@ def main() -> None:
             if use_cloud and cloud_llm is not None:
                 logger.info("call_start | provider=%s | model=%s", cloud_info.key, cloud_model)
                 with slot.container():
-                    answer = st.write_stream(_tracked_stream(cloud_llm.stream(lc_messages, timeout=LLM_TIMEOUT), usage))
+                    answer = st.write_stream(_tracked_stream(cloud_llm.stream(lc_messages), usage))
                 ms = int((time.perf_counter() - t0) * 1000)
                 cost = _estimate_cost(cloud_info.key, cloud_model, usage.get("input_tokens", 0), usage.get("output_tokens", 0))
                 meta = {"label": f"Cloud · {cloud_info.label}/{cloud_model} · {route_reason}", "provider": cloud_info.key, "model": cloud_model, "latency_ms": ms, "input_tokens": usage.get("input_tokens", 0), "output_tokens": usage.get("output_tokens", 0), "cost_usd": cost}
@@ -341,7 +339,7 @@ def main() -> None:
             elif local_llm is not None:
                 logger.info("call_start | provider=%s | model=%s", local_info.key, local_model)
                 with slot.container():
-                    answer = st.write_stream(_tracked_stream(local_llm.stream(lc_messages, timeout=LLM_TIMEOUT), usage))
+                    answer = st.write_stream(_tracked_stream(local_llm.stream(lc_messages), usage))
                 ms = int((time.perf_counter() - t0) * 1000)
                 meta = {"label": f"Local · {local_info.label}/{local_model} · {route_reason}", "provider": local_info.key, "model": local_model, "latency_ms": ms, "input_tokens": usage.get("input_tokens", 0), "output_tokens": usage.get("output_tokens", 0), "cost_usd": 0.0}
                 logger.info("call_done | provider=%s | chars=%s | ms=%s", local_info.key, len(answer), ms)
@@ -354,7 +352,7 @@ def main() -> None:
                     usage_fb: dict = {}
                     t_fb = time.perf_counter()
                     with slot.container():
-                        answer = st.write_stream(_tracked_stream(cloud_llm.stream(lc_messages, timeout=LLM_TIMEOUT), usage_fb))
+                        answer = st.write_stream(_tracked_stream(cloud_llm.stream(lc_messages), usage_fb))
                     ms_fb = int((time.perf_counter() - t_fb) * 1000)
                     cost_fb = _estimate_cost(cloud_info.key, cloud_model, usage_fb.get("input_tokens", 0), usage_fb.get("output_tokens", 0))
                     meta = {"label": f"Escalated · {cloud_info.label}/{cloud_model} · local quality low", "provider": cloud_info.key, "model": cloud_model, "latency_ms": ms_fb, "input_tokens": usage_fb.get("input_tokens", 0), "output_tokens": usage_fb.get("output_tokens", 0), "cost_usd": cost_fb, "fallback": True}

@@ -4,6 +4,8 @@ from typing import Optional
 import streamlit as st
 from langchain_core.language_models.chat_models import BaseChatModel
 
+import os
+
 from config import (
     OLLAMA_BASE_URL, OLLAMA_MODEL, OLLAMA_MODEL_OPTIONS,
     LMSTUDIO_BASE_URL, LMSTUDIO_MODEL_OPTIONS,
@@ -12,6 +14,8 @@ from config import (
     ANTHROPIC_API_KEY, ANTHROPIC_MODEL, ANTHROPIC_MODEL_OPTIONS,
     parse_options,
 )
+
+_TIMEOUT = int(os.getenv("LLM_TIMEOUT", "120"))
 
 
 @dataclass
@@ -30,31 +34,31 @@ class ProviderInfo:
 @st.cache_resource
 def _ollama_llm(model: str, base_url: str) -> BaseChatModel:
     from langchain_ollama import ChatOllama
-    return ChatOllama(model=model, base_url=base_url, temperature=0.2)
+    return ChatOllama(model=model, base_url=base_url, temperature=0.2, timeout=_TIMEOUT)
 
 
 @st.cache_resource
 def _lmstudio_llm(model: str, base_url: str) -> BaseChatModel:
     from langchain_openai import ChatOpenAI
-    return ChatOpenAI(model=model, base_url=base_url, api_key="lm-studio", temperature=0.2)
+    return ChatOpenAI(model=model, base_url=base_url, api_key="lm-studio", temperature=0.2, timeout=_TIMEOUT)
 
 
 @st.cache_resource
 def _gemini_llm(model: str, api_key: str) -> BaseChatModel:
     from langchain_google_genai import ChatGoogleGenerativeAI
-    return ChatGoogleGenerativeAI(model=model, google_api_key=api_key, temperature=0.2)
+    return ChatGoogleGenerativeAI(model=model, google_api_key=api_key, temperature=0.2, request_timeout=_TIMEOUT)
 
 
 @st.cache_resource
 def _openai_llm(model: str, api_key: str) -> BaseChatModel:
     from langchain_openai import ChatOpenAI
-    return ChatOpenAI(model=model, api_key=api_key, temperature=0.2)
+    return ChatOpenAI(model=model, api_key=api_key, temperature=0.2, timeout=_TIMEOUT)
 
 
 @st.cache_resource
 def _anthropic_llm(model: str, api_key: str) -> BaseChatModel:
     from langchain_anthropic import ChatAnthropic
-    return ChatAnthropic(model=model, api_key=api_key, temperature=0.2)
+    return ChatAnthropic(model=model, api_key=api_key, temperature=0.2, timeout=_TIMEOUT)
 
 
 # ---------------------------------------------------------------------------
