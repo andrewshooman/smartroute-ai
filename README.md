@@ -1,4 +1,4 @@
-# Hybrid Memory Router Chat
+# SmartRoute AI
 
 A Streamlit + LangChain chat app that prioritizes your local Ollama model and escalates to Gemini when needed.
 

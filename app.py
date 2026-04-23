@@ -214,8 +214,8 @@ def _to_lc_messages(history: List[Dict[str, str]]) -> List[BaseMessage]:
 def main() -> None:
     logger = _setup_logger()
     _init_memory_db()
-    st.set_page_config(page_title="Hybrid LangChain Chat", page_icon=":speech_balloon:")
-    st.title("Hybrid LangChain Chat")
+    st.set_page_config(page_title="SmartRoute AI", page_icon=":speech_balloon:")
+    st.title("SmartRoute AI")
     st.caption("Routes easy prompts to local model and escalates hard prompts to cloud.")
 
     if "messages" not in st.session_state:
