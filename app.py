@@ -199,8 +199,6 @@ def _local_quality_low(answer: str) -> bool:
         "i may be wrong",
         "might be wrong",
     ]
-    if len(answer.strip()) < 100:
-        return True
     return any(marker in lower for marker in weak_markers)
 
 
@@ -312,39 +310,40 @@ def main() -> None:
     )
 
     with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            answer = ""
-            route_meta = ""
-            try:
-                if decision.use_cloud and cloud_llm is not None:
-                    logger.info("model_call_start | provider=gemini | model=%s", cloud_selected)
-                    response = cloud_llm.invoke(lc_messages)
-                    answer = response.content
-                    route_meta = f"Routed to cloud: {decision.reason}"
-                    logger.info("model_call_done | provider=gemini | model=%s", cloud_selected)
-                else:
-                    logger.info("model_call_start | provider=ollama | model=%s", local_selected)
-                    response = local_llm.invoke(lc_messages)
-                    answer = response.content
-                    route_meta = f"Routed to local: {decision.reason}"
-                    logger.info("model_call_done | provider=ollama | model=%s", local_selected)
+        answer = ""
+        route_meta = ""
+        response_slot = st.empty()
+        try:
+            if decision.use_cloud and cloud_llm is not None:
+                logger.info("model_call_start | provider=gemini | model=%s", cloud_selected)
+                with response_slot.container():
+                    answer = st.write_stream(cloud_llm.stream(lc_messages))
+                route_meta = f"Routed to cloud: {decision.reason}"
+                logger.info("model_call_done | provider=gemini | chars=%s", len(answer))
+            else:
+                logger.info("model_call_start | provider=ollama | model=%s", local_selected)
+                with response_slot.container():
+                    answer = st.write_stream(local_llm.stream(lc_messages))
+                route_meta = f"Routed to local: {decision.reason}"
+                logger.info("model_call_done | provider=ollama | chars=%s", len(answer))
 
-                    if cloud_llm is not None and _local_quality_low(answer):
-                        logger.info(
-                            "fallback_triggered | from=ollama:%s | to=gemini:%s",
-                            local_selected,
-                            cloud_selected,
-                        )
-                        cloud_response = cloud_llm.invoke(lc_messages)
-                        answer = cloud_response.content
-                        route_meta = "Local answer quality low, escalated to cloud fallback."
-                        logger.info("model_call_done | provider=gemini | model=%s", cloud_selected)
-            except Exception as exc:
-                answer = f"Error while generating response: {exc}"
-                route_meta = "Model call failed."
-                logger.exception("model_call_error | error=%s", exc)
+                if cloud_llm is not None and _local_quality_low(answer):
+                    logger.info(
+                        "fallback_triggered | from=ollama:%s | to=gemini:%s",
+                        local_selected,
+                        cloud_selected,
+                    )
+                    response_slot.empty()
+                    with response_slot.container():
+                        answer = st.write_stream(cloud_llm.stream(lc_messages))
+                    route_meta = "Local answer quality low, escalated to cloud fallback."
+                    logger.info("model_call_done | provider=gemini | chars=%s", len(answer))
+        except Exception as exc:
+            answer = f"Error while generating response: {exc}"
+            route_meta = "Model call failed."
+            logger.exception("model_call_error | error=%s", exc)
+            response_slot.markdown(answer)
 
-        st.markdown(answer)
         st.caption(route_meta)
 
     st.session_state.messages.append(
