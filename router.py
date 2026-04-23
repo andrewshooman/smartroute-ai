@@ -8,6 +8,9 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 
 logger = logging.getLogger("hybrid_router")
 
+# Prompts scoring below this skip the LLM judge entirely and go local immediately.
+_JUDGE_SKIP_THRESHOLD = 0.2
+
 
 @dataclass
 class RouteDecision:
@@ -50,6 +53,11 @@ def judge_route(local_llm: BaseChatModel, user_text: str, cloud_available: bool)
     if not cloud_available:
         return RouteDecision(False, "cloud unavailable")
 
+    # Skip the judge call entirely for obviously simple prompts.
+    complexity = estimate_complexity(user_text)
+    if complexity < _JUDGE_SKIP_THRESHOLD:
+        return RouteDecision(False, f"trivial complexity ({complexity:.2f}), skipped judge")
+
     router_prompt = (
         "You are a routing judge. Decide if a small local model can fully answer "
         "the user request at high quality.\n"
@@ -78,7 +86,14 @@ def judge_route(local_llm: BaseChatModel, user_text: str, cloud_available: bool)
 
 
 def quality_low(answer: str) -> bool:
-    lower = answer.lower().strip()
+    """Return True only if weak-confidence markers appear in the first third of the response."""
+    stripped = answer.strip()
+    lower = stripped.lower()
+
+    # Only scan the opening portion — a hedge mid-answer shouldn't trigger a fallback.
+    scan_limit = max(200, len(lower) // 3)
+    scan_zone = lower[:scan_limit]
+
     weak_markers = [
         "i don't know", "i do not know", "not sure",
         "cannot help with that", "can't help with that",
@@ -89,7 +104,7 @@ def quality_low(answer: str) -> bool:
         "needs to be looked up", "insufficient context",
         "i may be wrong", "might be wrong",
     ]
-    return any(marker in lower for marker in weak_markers)
+    return any(marker in scan_zone for marker in weak_markers)
 
 
 def to_lc_messages(

@@ -118,6 +118,10 @@ def cloud_providers() -> list[ProviderInfo]:
     return providers
 
 
+def get_provider(providers: list[ProviderInfo], key: str) -> Optional[ProviderInfo]:
+    return next((p for p in providers if p.key == key), None)
+
+
 def get_llm(provider_key: str, model: str) -> Optional[BaseChatModel]:
     if provider_key == "ollama":
         return _ollama_llm(model, OLLAMA_BASE_URL)

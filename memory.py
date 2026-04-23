@@ -9,10 +9,17 @@ def _connect() -> sqlite3.Connection:
     os.makedirs(os.path.dirname(MEMORY_DB_PATH), exist_ok=True)
     conn = sqlite3.connect(MEMORY_DB_PATH)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
     return conn
 
 
+_db_initialized = False
+
+
 def init_db() -> None:
+    global _db_initialized
+    if _db_initialized:
+        return
     with _connect() as conn:
         conn.execute(
             """
@@ -20,11 +27,12 @@ def init_db() -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 role TEXT NOT NULL,
                 content TEXT NOT NULL,
-                meta TEXT DEFAULT '',
+                meta TEXT DEFAULT '{}',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
             """
         )
+    _db_initialized = True
 
 
 def load_messages() -> List[Dict[str, str]]:
