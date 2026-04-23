@@ -90,9 +90,9 @@ def quality_low(answer: str) -> bool:
     stripped = answer.strip()
     lower = stripped.lower()
 
-    # Only scan the opening portion — a hedge mid-answer shouldn't trigger a fallback.
-    scan_limit = max(200, len(lower) // 3)
-    scan_zone = lower[:scan_limit]
+    # Short responses: scan all (a hedge anywhere in a short answer = low quality).
+    # Longer responses: only scan the first 40% — hedges buried at the end don't count.
+    scan_zone = lower if len(lower) < 100 else lower[: int(len(lower) * 0.4)]
 
     weak_markers = [
         "i don't know", "i do not know", "not sure",
