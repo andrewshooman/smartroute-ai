@@ -20,6 +20,10 @@ LOCAL_BASE_URL = os.getenv("LOCAL_BASE_URL", "http://localhost:11434")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 LOG_FILE = os.getenv("LOG_FILE", "logs/router.log")
 MEMORY_DB_PATH = os.getenv("MEMORY_DB_PATH", "data/memory.db")
+LOCAL_MODEL_OPTIONS = os.getenv(
+    "LOCAL_MODEL_OPTIONS", "llama3.1:8b-instruct-q4_0,gpt-oss:20b,gemma4:latest"
+)
+CLOUD_MODEL_OPTIONS = os.getenv("CLOUD_MODEL_OPTIONS", "gemini-2.5-flash")
 
 
 def _setup_logger() -> logging.Logger:
@@ -86,6 +90,11 @@ def _save_message(role: str, content: str, meta: str = "") -> None:
 def _clear_memory() -> None:
     with _get_db_connection() as conn:
         conn.execute("DELETE FROM messages")
+
+
+def _parse_options(raw: str) -> List[str]:
+    options = [item.strip() for item in raw.split(",") if item.strip()]
+    return options
 
 
 @dataclass
@@ -223,14 +232,8 @@ def main() -> None:
         logger.info("memory_loaded | messages=%s", len(st.session_state.messages))
 
     cloud_available = bool(GEMINI_API_KEY)
-    local_llm = ChatOllama(model=LOCAL_MODEL, base_url=LOCAL_BASE_URL, temperature=0.2)
-    cloud_llm = None
-    if cloud_available:
-        cloud_llm = ChatGoogleGenerativeAI(
-            model=CLOUD_MODEL,
-            google_api_key=GEMINI_API_KEY,
-            temperature=0.2,
-        )
+    local_model_options = _parse_options(LOCAL_MODEL_OPTIONS) or [LOCAL_MODEL]
+    cloud_model_options = _parse_options(CLOUD_MODEL_OPTIONS) or [CLOUD_MODEL]
 
     with st.sidebar:
         st.subheader("Config")
@@ -240,8 +243,20 @@ def main() -> None:
             index=0,
             help="Auto uses heuristics, Local only always uses Ollama, Cloud only always uses Gemini.",
         )
-        st.write(f"Local model: `{LOCAL_MODEL}`")
-        st.write(f"Cloud model: `{CLOUD_MODEL}`")
+        local_selected = st.selectbox(
+            "Local model (Ollama)",
+            options=local_model_options,
+            index=local_model_options.index(LOCAL_MODEL) if LOCAL_MODEL in local_model_options else 0,
+        )
+        cloud_selected = st.selectbox(
+            "Cloud model (Gemini)",
+            options=cloud_model_options,
+            index=cloud_model_options.index(CLOUD_MODEL) if CLOUD_MODEL in cloud_model_options else 0,
+        )
+        st.write(f"Default local model: `{LOCAL_MODEL}`")
+        st.write(f"Default cloud model: `{CLOUD_MODEL}`")
+        st.write(f"Active local model: `{local_selected}`")
+        st.write(f"Active cloud model: `{cloud_selected}`")
         st.write(f"Cloud available: `{'yes' if cloud_available else 'no'}`")
         st.write(f"Log file: `{LOG_FILE}`")
         st.write(f"Memory DB: `{MEMORY_DB_PATH}`")
@@ -251,6 +266,15 @@ def main() -> None:
             st.session_state.messages = []
             logger.info("memory_cleared")
             st.rerun()
+
+    local_llm = ChatOllama(model=local_selected, base_url=LOCAL_BASE_URL, temperature=0.2)
+    cloud_llm = None
+    if cloud_available:
+        cloud_llm = ChatGoogleGenerativeAI(
+            model=cloud_selected,
+            google_api_key=GEMINI_API_KEY,
+            temperature=0.2,
+        )
 
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
@@ -293,28 +317,28 @@ def main() -> None:
             route_meta = ""
             try:
                 if decision.use_cloud and cloud_llm is not None:
-                    logger.info("model_call_start | provider=gemini | model=%s", CLOUD_MODEL)
+                    logger.info("model_call_start | provider=gemini | model=%s", cloud_selected)
                     response = cloud_llm.invoke(lc_messages)
                     answer = response.content
                     route_meta = f"Routed to cloud: {decision.reason}"
-                    logger.info("model_call_done | provider=gemini | model=%s", CLOUD_MODEL)
+                    logger.info("model_call_done | provider=gemini | model=%s", cloud_selected)
                 else:
-                    logger.info("model_call_start | provider=ollama | model=%s", LOCAL_MODEL)
+                    logger.info("model_call_start | provider=ollama | model=%s", local_selected)
                     response = local_llm.invoke(lc_messages)
                     answer = response.content
                     route_meta = f"Routed to local: {decision.reason}"
-                    logger.info("model_call_done | provider=ollama | model=%s", LOCAL_MODEL)
+                    logger.info("model_call_done | provider=ollama | model=%s", local_selected)
 
                     if cloud_llm is not None and _local_quality_low(answer):
                         logger.info(
                             "fallback_triggered | from=ollama:%s | to=gemini:%s",
-                            LOCAL_MODEL,
-                            CLOUD_MODEL,
+                            local_selected,
+                            cloud_selected,
                         )
                         cloud_response = cloud_llm.invoke(lc_messages)
                         answer = cloud_response.content
                         route_meta = "Local answer quality low, escalated to cloud fallback."
-                        logger.info("model_call_done | provider=gemini | model=%s", CLOUD_MODEL)
+                        logger.info("model_call_done | provider=gemini | model=%s", cloud_selected)
             except Exception as exc:
                 answer = f"Error while generating response: {exc}"
                 route_meta = "Model call failed."

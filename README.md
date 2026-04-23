@@ -49,6 +49,8 @@ Copy-Item .env.example .env
 GEMINI_API_KEY=your_key_here
 LOCAL_MODEL=llama3.1:8b-instruct-q4_0
 CLOUD_MODEL=gemini-2.5-flash
+LOCAL_MODEL_OPTIONS=llama3.1:8b-instruct-q4_0,gpt-oss:20b,gemma4:latest
+CLOUD_MODEL_OPTIONS=gemini-2.5-flash
 LOCAL_BASE_URL=http://localhost:11434
 LOG_FILE=logs/router.log
 MEMORY_DB_PATH=data/memory.db
@@ -71,6 +73,7 @@ ollama list
 - `Local only`: always uses Ollama
 - `Cloud only`: always uses Gemini (when key is configured)
 - `Auto`: local judge decides route first, then fallback can escalate to Gemini if local output is weak
+- You can choose active local/cloud models in the sidebar from your configured model option lists
 
 ## Memory
 
